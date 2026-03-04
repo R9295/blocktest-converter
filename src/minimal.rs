@@ -114,6 +114,7 @@ pub struct MinimalTx {
     #[serde(rename = "accessList", default, skip_serializing_if = "Option::is_none")]
     pub access_list: Option<Vec<MinimalAccessListEntry>>,
     /// EIP-2718 transaction type: 0=legacy, 1=access-list, 2=dynamic-fee, 3=blob, 4=set-code.
+    #[serde(rename = "txType")]
     pub tx_type: u8,
     /// Max priority fee (tip) for type-2/3/4 txs.
     #[serde(rename = "maxPriorityFee")]

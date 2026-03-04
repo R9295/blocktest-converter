@@ -36,3 +36,6 @@ reth-trie-db = { path = "./reth/crates/trie/db" }
 revm = { version = "34.0.0", features = ["secp256k1", "blst", "c-kzg", "memory_limit"]}
 ef-tests = {path = "./reth/testing/ef-tests/"}
 thiserror = "2.0.18"
+
+[dev-dependencies]
+tempfile = "3"

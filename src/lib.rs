@@ -1334,3 +1334,130 @@ pub unsafe extern "C" fn blocktest_result_free(ptr: *mut u8, len: usize) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    const EXAMPLE_INPUT: &str = r#"{
+        "version": "1",
+        "fork": "Osaka",
+        "chainId": 1,
+        "env": {
+            "currentCoinbase": "0x2adc25665018aa1fe0e6bc666dac8fc2697ff9ba",
+            "currentDifficulty": "0x0",
+            "currentGasLimit": "0x1000000",
+            "currentNumber": "0x1",
+            "currentTimestamp": "0x3e8",
+            "currentBaseFee": "0x7",
+            "currentRandom": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "accounts": {
+            "0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b": {
+                "balance": "0xde0b6b3a7640000",
+                "nonce": "0x0",
+                "storage": {},
+                "privateKey": "0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d8"
+            },
+            "0x1000000000000000000000000000000000000000": {
+                "balance": "0x0",
+                "nonce": "0x0",
+                "code": "0x6001600055",
+                "storage": {}
+            }
+        },
+        "blocks": [
+            {
+                "transactions": [
+                    {
+                        "from": "0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b",
+                        "chainId": "0x1",
+                        "to": "0x1000000000000000000000000000000000000000",
+                        "value": "0x1",
+                        "gas": "0x186a0",
+                        "nonce": "0x0",
+                        "data": "0x",
+                        "txType": 2,
+                        "maxFee": "0xe",
+                        "maxPriorityFee": "0x1"
+                    }
+                ]
+            }
+        ]
+    }"#;
+
+    /// Sender address from the example.
+    const SENDER: &str = "0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b";
+    /// Contract address from the example.
+    const CONTRACT: &str = "0x1000000000000000000000000000000000000000";
+
+    #[test]
+    fn test_convert() {
+        let input: minimal::SimplifiedInput = serde_json::from_str(EXAMPLE_INPUT).unwrap();
+        let result = convert(&input).expect("conversion should succeed");
+
+        assert_eq!(result.len(), 1);
+        let test = result.values().next().unwrap();
+        assert_eq!(test.blocks.len(), 1);
+        assert!(test.blocks[0].expect_exception.is_none());
+        assert!(test.blocks[0].block_header.is_some());
+        assert_eq!(test.network, "Osaka");
+        assert_eq!(test.pre.len(), 2);
+        serde_json::to_string(&result).expect("output should serialize");
+    }
+
+    #[test]
+    fn test_geth_evm_blocktest() {
+        // Convert
+        let input: minimal::SimplifiedInput = serde_json::from_str(EXAMPLE_INPUT).unwrap();
+        let blocktest = convert(&input).expect("conversion should succeed");
+        let blocktest_json = serde_json::to_string_pretty(&blocktest).unwrap();
+
+        // Write to temp file
+        let mut tmpfile = tempfile::NamedTempFile::new().expect("failed to create temp file");
+        tmpfile.write_all(blocktest_json.as_bytes()).unwrap();
+        tmpfile.flush().unwrap();
+
+        // Run geth evm blocktest --dump
+        let output = std::process::Command::new("evm")
+            .args(["blocktest", "--dump", tmpfile.path().to_str().unwrap()])
+            .output()
+            .expect("failed to run `evm` binary — is go-ethereum installed?");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        assert!(
+            output.status.success(),
+            "evm blocktest failed (exit {}):\nstdout: {stdout}\nstderr: {stderr}",
+            output.status,
+        );
+
+        // Parse the dump JSON to verify post-state.
+        let dump: serde_json::Value = serde_json::from_str(&stdout)
+            .expect("evm --dump output should be valid JSON");
+
+        let test_result = &dump[0];
+        assert_eq!(test_result["pass"], true, "geth evm should report test as passing");
+
+        let accounts = &test_result["state"]["accounts"];
+
+        // The contract should have received 1 wei and written to storage.
+        let contract_acct = &accounts[CONTRACT];
+        assert_eq!(contract_acct["balance"], "1", "contract should have 1 wei");
+        let slot_zero = "0x0000000000000000000000000000000000000000000000000000000000000000";
+        assert_eq!(
+            contract_acct["storage"][slot_zero], "01",
+            "contract storage slot 0 should be 1",
+        );
+
+        // The sender nonce should have incremented.
+        let sender_lower = SENDER.to_lowercase();
+        let sender_acct = accounts.as_object().unwrap().iter()
+            .find(|(k, _)| k.to_lowercase() == sender_lower)
+            .map(|(_, v)| v)
+            .expect("sender should be in post-state");
+        assert_eq!(sender_acct["nonce"], 1, "sender nonce should be 1");
+    }
+}

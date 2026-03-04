@@ -214,3 +214,57 @@ Prague, Osaka.
 
 Transition forks (e.g. `BerlinToLondonAt5`, `ShanghaiToCancunAtTime15k`) are
 also supported.
+
+## Example
+
+A complete `SimplifiedInput` that transfers 1 wei from an EOA to a contract
+via an EIP-1559 transaction on Osaka:
+
+```json
+{
+  "version": "1",
+  "fork": "Osaka",
+  "chainId": 1,
+  "env": {
+    "currentCoinbase": "0x2adc25665018aa1fe0e6bc666dac8fc2697ff9ba",
+    "currentDifficulty": "0x0",
+    "currentGasLimit": "0x1000000",
+    "currentNumber": "0x1",
+    "currentTimestamp": "0x3e8",
+    "currentBaseFee": "0x7",
+    "currentRandom": "0x0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "accounts": {
+    "0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b": {
+      "balance": "0xde0b6b3a7640000",
+      "nonce": "0x0",
+      "storage": {},
+      "privateKey": "0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d8"
+    },
+    "0x1000000000000000000000000000000000000000": {
+      "balance": "0x0",
+      "nonce": "0x0",
+      "code": "0x6001600055",
+      "storage": {}
+    }
+  },
+  "blocks": [
+    {
+      "transactions": [
+        {
+          "from": "0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b",
+          "chainId": "0x1",
+          "to": "0x1000000000000000000000000000000000000000",
+          "value": "0x1",
+          "gas": "0x186a0",
+          "nonce": "0x0",
+          "data": "0x",
+          "txType": 2,
+          "maxFee": "0xe",
+          "maxPriorityFee": "0x1"
+        }
+      ]
+    }
+  ]
+}
+```
