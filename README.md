@@ -1,6 +1,21 @@
 # blocktest-converter
 
-Converts a fuzzer-friendly input structure into Ethereum's [Block Test](https://ethereum-tests.readthedocs.io/en/v6.0.0-beta.1/test_types/blockchain_tests.html) format -- the standard format consumed by geth, besu, Nethermind, reth and other EL clients.
+## Table of contents
+
+- [About](#about)
+- [Usage](#usage)
+- [Pipeline](#pipeline)
+- [Input format](#input-format)
+  - [Transaction types](#transaction-types)
+  - [Signing](#signing)
+- [Supported forks](#supported-forks)
+
+# About
+It is extremely difficult to generate good blocktests when fuzzing as all the hash and root computations in the header's block require execution of the all the transactions. Then comes the precise consturction of the test to make sure it adheres to the block test format.
+
+This library aims to solve both problems and to the best of my knowledge, is the only library based, documented implementation.
+
+Essentially, it converts a fuzzer-friendly input structure into Ethereum's [Block Test](https://ethereum-tests.readthedocs.io/en/v6.0.0-beta.1/test_types/blockchain_tests.html) format -- the standard format consumed by geth, besu, Nethermind, reth and other EL clients.
 
 Block tests allow testing of the entire block processing pipeline, from validation, execution to state commitment.
 It is a powerful primitive for testing the adherence of EL clients to a specification.
@@ -10,18 +25,9 @@ Fuzzing with this library has already found three novel bugs.
 - [Besu #2](https://github.com/hyperledger/besu/issues/9868)
 - Potential security impact, currently being triaged..
 
-It additionally found two known bugs in Reth and one known edge case in Nethermind.
+It additionally found two known bugs in Reth and one known potential edge case in Nethermind. These were not submitted but are mentioned since it shows that the converter is able to reach known issues via a fuzzer.
 
-To see how it works, look at the [Pipeline](#pipeline) section below.
-
-## Table of contents
-
-- [Usage](#usage)
-- [Pipeline](#pipeline)
-- [Input format](#input-format)
-  - [Transaction types](#transaction-types)
-  - [Signing](#signing)
-- [Supported forks](#supported-forks)
+To see how it works, look at the [Pipeline](#pipeline) section.
 
 ## Usage
 
