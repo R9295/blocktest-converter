@@ -131,7 +131,7 @@ values use `0x`-prefixed strings.
       "storage": { "0x00..00": "0x00..01" }
     }
   },
-  "blocks": [
+  "blocks": [                                // list of blocks (with list of transactions within)
     {
       "transactions": [
         {
