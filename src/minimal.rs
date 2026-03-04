@@ -76,8 +76,8 @@ pub struct MinimalAccount {
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct MinimalTx {
     pub from: String,
-    #[serde(rename = "chainId", default, skip_serializing_if = "Option::is_none")]
-    pub chain_id: Option<String>,
+    #[serde(rename = "chainId")]
+    pub chain_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub to: Option<String>,
     pub value: String,

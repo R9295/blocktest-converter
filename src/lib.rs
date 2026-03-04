@@ -281,7 +281,6 @@ fn build_pre_state(input: &SimplifiedInput) -> Result<BTreeMap<Address, GenesisA
 fn build_signed_tx(
     input: &SimplifiedInput,
     tx: &MinimalTx,
-    chain_id: u64,
     base_fee: u64,
 ) -> Result<TransactionSigned, Error> {
 
@@ -290,11 +289,7 @@ fn build_signed_tx(
     let gas_limit = parse_u64(&tx.gas, "tx gas")?;
     let value = parse_u256(&tx.value, "tx value")?;
     let gas_price = parse_u128(&tx.gas_price, "tx gasPrice")?;
-    let tx_chain_id = tx
-        .chain_id
-        .as_deref()
-        .map(|v| parse_u64(v, "tx chainId"))
-        .transpose()?;
+    let tx_chain_id = parse_u64(&tx.chain_id, "tx chainId")?;
     let data = parse_bytes(&tx.data);
     let to = match &tx.to {
         Some(addr_str) => alloy_primitives::TxKind::Call(parse_address(addr_str, "tx to")?),
@@ -323,35 +318,11 @@ fn build_signed_tx(
         })
         .collect::<Result<_, _>>()?;
     let access_list = AccessList::from(access_list_vec);
-    let provided_sig = match (tx.v.as_deref(), tx.r.as_deref(), tx.s.as_deref()) {
-        (Some(v), Some(r), Some(s)) => Some((
-            parse_u64(v, "tx v")?,
-            parse_u256(r, "tx r")?,
-            parse_u256(s, "tx s")?,
-        )),
-        (None, None, None) => None,
-        _ => {
-            return Err(Error::ConversionFailure(
-                "partial tx signature fields: expected v/r/s together".to_string()
-            ));
-        }
-    };
+    let resolved_tx_type = tx.tx_type;
 
-    // Determine tx type: explicit or inferred
-    let tx_type = tx.tx_type;
+    let legacy_chain_id = Some(tx_chain_id);
 
-    let mut legacy_chain_id = tx_chain_id.or(Some(chain_id));
-    if resolved_tx_type == 0 {
-        if let Some((v_raw, _, _)) = provided_sig {
-            if v_raw == 27 || v_raw == 28 {
-                legacy_chain_id = None;
-            } else if v_raw >= 35 {
-                legacy_chain_id = Some((v_raw - 35) / 2);
-            }
-        }
-    }
-
-    let typed_chain_id = tx_chain_id.unwrap_or(chain_id);
+    let typed_chain_id = tx_chain_id;
     let transaction: Transaction = match resolved_tx_type {
         0 => {
             // Legacy
@@ -515,38 +486,20 @@ fn build_signed_tx(
         _ => return Err(Error::ConversionFailure(format!("unsupported tx type {resolved_tx_type}"))),
     };
 
-    let signature = if let Some((v_raw, r_val, s_val)) = provided_sig {
-        let y_parity = if resolved_tx_type == 0 {
-            if v_raw == 27 || v_raw == 28 {
-                v_raw == 28
-            } else if v_raw >= 35 {
-                ((v_raw - 35) & 1) == 1
-            } else {
-                (v_raw & 1) == 1
-            }
-        } else if v_raw == 27 || v_raw == 28 {
-            v_raw == 28
-        } else {
-            (v_raw & 1) == 1
-        };
-        Signature::new(r_val, s_val, y_parity)
-    } else {
-        // Fall back to local signing when the minimal transaction did not carry
-        // signature fields.
-        let sender_acct = input
-            .accounts
-            .get(&tx.from)
-            .ok_or_else(|| Error::ConversionFailure(format!("sender {} not found", tx.from)))?;
-        let pk_hex = sender_acct
-            .private_key
-            .as_deref()
-            .ok_or_else(|| Error::ConversionFailure(format!("sender {} missing private key", tx.from)))?;
-        let pk_bytes = hex::decode(strip_hex_prefix(pk_hex))
-            .map_err(|e| Error::ConversionFailure(format!("invalid private key: {e}")))?;
-        let private_key = B256::from_slice(&pk_bytes);
-        let sig_hash = transaction.signature_hash();
-        sign_message(private_key, sig_hash).map_err(|e| Error::ConversionFailure(format!("signing failed: {e}")))?
-    };
+    let sender_acct = input
+        .accounts
+        .get(&tx.from)
+        .ok_or_else(|| Error::ConversionFailure(format!("sender {} not found", tx.from)))?;
+    let pk_hex = sender_acct
+        .private_key
+        .as_deref()
+        .ok_or_else(|| Error::ConversionFailure(format!("sender {} missing private key", tx.from)))?;
+    let pk_bytes = hex::decode(strip_hex_prefix(pk_hex))
+        .map_err(|e| Error::ConversionFailure(format!("invalid private key: {e}")))?;
+    let private_key = B256::from_slice(&pk_bytes);
+    let sig_hash = transaction.signature_hash();
+    let signature = sign_message(private_key, sig_hash)
+        .map_err(|e| Error::ConversionFailure(format!("signing failed: {e}")))?;
     let signed: TransactionSigned = transaction.into_signed(signature).into();
 
     Ok(signed)
@@ -589,8 +542,6 @@ pub fn convert(input: &SimplifiedInput) -> Result<BlockTestFile, Error> {
         return Err(Error::ConversionFailure("input has no blocks".to_string()));
     }
     let chain_spec = ForkSpec::Osaka.to_chain_spec();
-    let chain_id = chain_spec.chain().id();
-
     // --- Build genesis header from chain spec defaults + env overrides ---
     let mut genesis_ef_header = from_consensus_header(chain_spec.genesis_header());
     apply_env_to_genesis(&mut genesis_ef_header, input)?;
@@ -722,7 +673,7 @@ pub fn convert(input: &SimplifiedInput) -> Result<BlockTestFile, Error> {
         let mut build_err = None;
 
         for (tx_idx, tx) in input_block.transactions.iter().enumerate() {
-            match build_signed_tx(input, tx, chain_id, block_base_fee) {
+            match build_signed_tx(input, tx, block_base_fee) {
                 Ok(signed) => {
                     let sender = signed.recover_signer().map_err(|e| {
                         Error::ConversionFailure(format!(
