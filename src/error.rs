@@ -14,10 +14,7 @@ pub enum Error {
 
 impl Error {
     /// Create a new [`Error::ProviderError`] from any error type.
-    pub fn provider_error(
-        err: impl std::error::Error + Send + Sync + 'static,
-    ) -> Self {
+    pub fn provider_error(err: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self::ProviderError { err: Box::new(err) }
     }
 }
-

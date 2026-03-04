@@ -1,10 +1,10 @@
-//! Simplified/minimal test input format.
+//! Converter Input format.
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Top-level simplified input describing a complete block test.
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct SimplifiedInput {
+pub struct Input {
     /// Format version (currently `"1"`).
     pub version: String,
     /// Ethereum fork name (e.g. `"Osaka"`, `"Cancun"`, `"Prague"`).
@@ -13,19 +13,19 @@ pub struct SimplifiedInput {
     #[serde(rename = "chainId")]
     pub chain_id: u64,
     /// Pre-state accounts keyed by hex address.
-    pub accounts: BTreeMap<String, MinimalAccount>,
+    pub accounts: BTreeMap<String, Account>,
     /// Ordered list of blocks to execute.
-    pub blocks: Vec<MinimalBlock>,
+    pub blocks: Vec<Block>,
     /// Block-level environment settings.
-    pub env: MinimalEnv,
+    pub env: Env,
 }
 
 /// A block containing transactions and optional withdrawals.
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct MinimalBlock {
-    pub transactions: Vec<MinimalTx>,
+pub struct Block {
+    pub transactions: Vec<Transaction>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub withdrawals: Option<Vec<MinimalWithdrawal>>,
+    pub withdrawals: Option<Vec<Withdrawal>>,
     #[serde(rename = "expectException", skip_serializing_if = "Option::is_none")]
     pub expect_exception: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -58,7 +58,7 @@ pub struct MinimalBlock {
 
 /// An EIP-4895 withdrawal.
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct MinimalWithdrawal {
+pub struct Withdrawal {
     pub index: String,
     #[serde(rename = "validatorIndex")]
     pub validator_index: String,
@@ -68,7 +68,7 @@ pub struct MinimalWithdrawal {
 
 /// An account in the pre-state.
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct MinimalAccount {
+pub struct Account {
     /// Account balance in wei (hex).
     pub balance: String,
     /// Account nonce (hex).
@@ -89,7 +89,7 @@ pub struct MinimalAccount {
 /// The converter signs transactions automatically using the sender's private
 /// key from the accounts map.
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct MinimalTx {
+pub struct Transaction {
     /// Sender address (hex). Must exist in the accounts map with a `privateKey`.
     pub from: String,
     /// Transaction chain ID (hex).
@@ -111,8 +111,12 @@ pub struct MinimalTx {
     /// Calldata (hex).
     pub data: String,
     /// EIP-2930 access list. Optional for all tx types.
-    #[serde(rename = "accessList", default, skip_serializing_if = "Option::is_none")]
-    pub access_list: Option<Vec<MinimalAccessListEntry>>,
+    #[serde(
+        rename = "accessList",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub access_list: Option<Vec<AccessListEntry>>,
     /// EIP-2718 transaction type: 0=legacy, 1=access-list, 2=dynamic-fee, 3=blob, 4=set-code.
     #[serde(rename = "txType")]
     pub tx_type: u8,
@@ -142,12 +146,12 @@ pub struct MinimalTx {
         default,
         skip_serializing_if = "Option::is_none"
     )]
-    pub authorization_list: Option<Vec<MinimalAuthorization>>,
+    pub authorization_list: Option<Vec<Authorization>>,
 }
 
 /// An EIP-2930/EIP-1559 access-list item.
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct MinimalAccessListEntry {
+pub struct AccessListEntry {
     pub address: String,
     #[serde(rename = "storageKeys")]
     pub storage_keys: Vec<String>,
@@ -155,7 +159,7 @@ pub struct MinimalAccessListEntry {
 
 /// An EIP-7702 authorization tuple.
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct MinimalAuthorization {
+pub struct Authorization {
     #[serde(rename = "chainId")]
     pub chain_id: String,
     pub address: String,
@@ -167,7 +171,7 @@ pub struct MinimalAuthorization {
 /// Block-level environment settings applied to genesis and/or execution blocks.
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
 #[allow(clippy::struct_field_names)]
-pub struct MinimalEnv {
+pub struct Env {
     /// Block coinbase / fee recipient address (hex, 20 bytes).
     #[serde(rename = "currentCoinbase")]
     pub current_coinbase: String,

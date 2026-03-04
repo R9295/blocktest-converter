@@ -1,4 +1,4 @@
-//! Converts a `SimplifiedInput` (minimal test format) into a valid blockchain
+//! Converts a `Input` (minimal test format) into a valid blockchain
 //! test JSON (`BlockTestFile`), mirroring the Go `evm convert` command.
 //!
 //! Pipeline: parse minimal → build genesis → sign txs → execute blocks via
@@ -18,24 +18,24 @@ use alloy_eips::eip2930::{AccessList, AccessListItem};
 use alloy_eips::eip4895::Withdrawal;
 use alloy_eips::eip7702::Authorization;
 use alloy_genesis::GenesisAccount;
-use alloy_primitives::{Address, Bloom, Bytes, FixedBytes, B256, U256};
+use alloy_primitives::{Address, B256, Bloom, Bytes, FixedBytes, U256};
 use alloy_rlp::Encodable;
 use ef_tests::models::{ForkSpec, Header};
 use reth_chainspec::EthChainSpec;
 use reth_db_common::init::{insert_genesis_hashes, insert_genesis_history, insert_genesis_state};
 use reth_ethereum_primitives::{Block, BlockBody, Transaction, TransactionSigned};
-use reth_evm::execute::Executor;
 use reth_evm::ConfigureEvm;
+use reth_evm::execute::Executor;
 use reth_evm_ethereum::EthEvmConfig;
 use reth_primitives_traits::crypto::secp256k1::sign_message;
 use reth_primitives_traits::{Header as ConsensusHeader, RecoveredBlock};
 use reth_primitives_traits::{SealedBlock, SealedHeader, SignerRecoverable};
-use reth_provider::test_utils::create_test_provider_factory_with_chain_spec;
 use reth_provider::DatabaseProviderFactory;
 use reth_provider::StaticFileProviderFactory;
 use reth_provider::StaticFileSegment;
 use reth_provider::StaticFileWriter;
 use reth_provider::StorageSettingsCache;
+use reth_provider::test_utils::create_test_provider_factory_with_chain_spec;
 use reth_provider::{
     BlockWriter, ExecutionOutcome, HistoryWriter, OriginalValuesKnown, StateWriteConfig,
     StateWriter, TrieWriter,
@@ -45,7 +45,7 @@ use reth_trie::{HashedPostState, KeccakKeyHasher, StateRoot};
 use reth_trie_db::DatabaseStateRoot;
 
 use crate::blocktest::{BlockTest, BlockTestFile, BtAccount, BtBlock, BtHeader};
-use crate::minimal::{MinimalBlock, MinimalTx, SimplifiedInput};
+use crate::minimal::{Input, Transaction as MinimalTransaction};
 
 // ---------------------------------------------------------------------------
 // Hex parsing helpers
@@ -250,7 +250,7 @@ fn header_to_bt(header: &ConsensusHeader) -> BtHeader {
 // ---------------------------------------------------------------------------
 
 /// Build the genesis state as a map of `GenesisAccount`, ready for insertion.
-fn build_pre_state(input: &SimplifiedInput) -> Result<BTreeMap<Address, GenesisAccount>, Error> {
+fn build_pre_state(input: &Input) -> Result<BTreeMap<Address, GenesisAccount>, Error> {
     let mut state = BTreeMap::new();
     for (addr_str, acct) in &input.accounts {
         let addr = parse_address(addr_str, "account address")?;
@@ -285,12 +285,7 @@ fn build_pre_state(input: &SimplifiedInput) -> Result<BTreeMap<Address, GenesisA
 
 /// Build and sign a single transaction.
 #[allow(clippy::too_many_lines)]
-fn build_signed_tx(
-    input: &SimplifiedInput,
-    tx: &MinimalTx,
-    base_fee: u64,
-) -> Result<TransactionSigned, Error> {
-
+fn build_signed_tx(input: &Input, tx: &MinimalTransaction) -> Result<TransactionSigned, Error> {
     // Parse common fields
     let nonce = parse_u64(&tx.nonce, "tx nonce")?;
     let gas_limit = parse_u64(&tx.gas, "tx gas")?;
@@ -329,7 +324,9 @@ fn build_signed_tx(
         0 => {
             // Legacy
             let gas_price = parse_u128(
-                tx.gas_price.as_deref().ok_or_else(|| Error::ConversionFailure("type 0 tx missing gasPrice".to_string()))?,
+                tx.gas_price.as_deref().ok_or_else(|| {
+                    Error::ConversionFailure("type 0 tx missing gasPrice".to_string())
+                })?,
                 "tx gasPrice",
             )?;
             TxLegacy {
@@ -346,7 +343,9 @@ fn build_signed_tx(
         1 => {
             // EIP-2930 access list
             let gas_price = parse_u128(
-                tx.gas_price.as_deref().ok_or_else(|| Error::ConversionFailure("type 1 tx missing gasPrice".to_string()))?,
+                tx.gas_price.as_deref().ok_or_else(|| {
+                    Error::ConversionFailure("type 1 tx missing gasPrice".to_string())
+                })?,
                 "tx gasPrice",
             )?;
             TxEip2930 {
@@ -390,7 +389,9 @@ fn build_signed_tx(
                 .unwrap_or(0);
             // Blob tx `to` must be an Address (contract creation not allowed per EIP-4844)
             let to_addr = parse_address(
-                tx.to.as_deref().ok_or_else(|| Error::ConversionFailure("type 3 (blob) tx requires a `to` address".to_string()))?,
+                tx.to.as_deref().ok_or_else(|| {
+                    Error::ConversionFailure("type 3 (blob) tx requires a `to` address".to_string())
+                })?,
                 "tx to",
             )?;
             let blob_hashes = tx
@@ -421,7 +422,11 @@ fn build_signed_tx(
             let fee_cap = parse_u128(&tx.max_fee, "maxFee")?;
             // Set-code tx `to` must be an Address (contract creation not allowed per EIP-7702)
             let to_addr = parse_address(
-                tx.to.as_deref().ok_or_else(|| Error::ConversionFailure("type 4 (set-code) tx requires a `to` address".to_string()))?,
+                tx.to.as_deref().ok_or_else(|| {
+                    Error::ConversionFailure(
+                        "type 4 (set-code) tx requires a `to` address".to_string(),
+                    )
+                })?,
                 "tx to",
             )?;
             let auth_list = tx
@@ -438,16 +443,21 @@ fn build_signed_tx(
                         address,
                         nonce: auth_nonce,
                     };
-                    let signer_acct = input
-                        .accounts
-                        .get(&a.signer)
-                        .ok_or_else(|| Error::ConversionFailure(format!("auth signer {} not found", a.signer)))?;
-                    let signer_pk_hex = signer_acct
-                        .private_key
-                        .as_deref()
-                        .ok_or_else(|| Error::ConversionFailure(format!("auth signer {} missing private key", a.signer)))?;
-                    let signer_pk_bytes = hex::decode(strip_hex_prefix(signer_pk_hex))
-                        .map_err(|e| Error::ConversionFailure(format!("invalid auth signer private key: {e}")))?;
+                    let signer_acct = input.accounts.get(&a.signer).ok_or_else(|| {
+                        Error::ConversionFailure(format!("auth signer {} not found", a.signer))
+                    })?;
+                    let signer_pk_hex = signer_acct.private_key.as_deref().ok_or_else(|| {
+                        Error::ConversionFailure(format!(
+                            "auth signer {} missing private key",
+                            a.signer
+                        ))
+                    })?;
+                    let signer_pk_bytes =
+                        hex::decode(strip_hex_prefix(signer_pk_hex)).map_err(|e| {
+                            Error::ConversionFailure(format!(
+                                "invalid auth signer private key: {e}"
+                            ))
+                        })?;
                     if signer_pk_bytes.len() != 32 {
                         return Err(Error::ConversionFailure(format!(
                             "auth signer {} private key must be 32 bytes, got {}",
@@ -456,8 +466,9 @@ fn build_signed_tx(
                         )));
                     }
                     let signer_pk = B256::from_slice(&signer_pk_bytes);
-                    let sig = sign_message(signer_pk, auth.signature_hash())
-                        .map_err(|e| Error::ConversionFailure(format!("auth signing failed: {e}")))?;
+                    let sig = sign_message(signer_pk, auth.signature_hash()).map_err(|e| {
+                        Error::ConversionFailure(format!("auth signing failed: {e}"))
+                    })?;
                     Ok(auth.into_signed(sig))
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -475,17 +486,20 @@ fn build_signed_tx(
             }
             .into()
         }
-        _ => return Err(Error::ConversionFailure(format!("unsupported tx type {resolved_tx_type}"))),
+        _ => {
+            return Err(Error::ConversionFailure(format!(
+                "unsupported tx type {resolved_tx_type}"
+            )));
+        }
     };
 
     let sender_acct = input
         .accounts
         .get(&tx.from)
         .ok_or_else(|| Error::ConversionFailure(format!("sender {} not found", tx.from)))?;
-    let pk_hex = sender_acct
-        .private_key
-        .as_deref()
-        .ok_or_else(|| Error::ConversionFailure(format!("sender {} missing private key", tx.from)))?;
+    let pk_hex = sender_acct.private_key.as_deref().ok_or_else(|| {
+        Error::ConversionFailure(format!("sender {} missing private key", tx.from))
+    })?;
     let pk_bytes = hex::decode(strip_hex_prefix(pk_hex))
         .map_err(|e| Error::ConversionFailure(format!("invalid private key: {e}")))?;
     if pk_bytes.len() != 32 {
@@ -534,13 +548,13 @@ struct ExceptionExecutionFields {
 // Public conversion entry point
 // ---------------------------------------------------------------------------
 
-/// Convert a `SimplifiedInput` into a `BlockTestFile`.
+/// Convert a `Input` into a `BlockTestFile`.
 ///
 /// Builds genesis, signs txs,
 /// executes blocks through reth's EVM, computes state roots, and assembles
 /// the blocktest JSON output.
 #[allow(clippy::too_many_lines)]
-pub fn convert(input: &SimplifiedInput) -> Result<BlockTestFile, Error> {
+pub fn convert(input: &Input) -> Result<BlockTestFile, Error> {
     if input.blocks.is_empty() {
         return Err(Error::ConversionFailure("input has no blocks".to_string()));
     }
@@ -678,7 +692,7 @@ pub fn convert(input: &SimplifiedInput) -> Result<BlockTestFile, Error> {
         let mut build_err = None;
 
         for (tx_idx, tx) in input_block.transactions.iter().enumerate() {
-            match build_signed_tx(input, tx, block_base_fee) {
+            match build_signed_tx(input, tx) {
                 Ok(signed) => {
                     let sender = signed.recover_signer().map_err(|e| {
                         Error::ConversionFailure(format!(
@@ -1100,7 +1114,7 @@ struct BlockEnv {
 /// In Go, genesis always gets timestamp=0, number=0, and only `gas_limit` /
 /// `base_fee` / difficulty from env.  The other env fields (coinbase, timestamp,
 /// random) are block-level values.
-fn apply_env_to_genesis(header: &mut Header, input: &SimplifiedInput) -> Result<(), Error> {
+fn apply_env_to_genesis(header: &mut Header, input: &Input) -> Result<(), Error> {
     let env = &input.env;
     let gas_limit = parse_u64(&env.current_gas_limit, "currentGasLimit")?;
     if gas_limit > 0 {
@@ -1129,7 +1143,7 @@ fn apply_env_to_genesis(header: &mut Header, input: &SimplifiedInput) -> Result<
 }
 
 /// Parse block-level environment values (used during block execution, NOT genesis).
-fn parse_block_env(input: &SimplifiedInput) -> Result<BlockEnv, Error> {
+fn parse_block_env(input: &Input) -> Result<BlockEnv, Error> {
     let env = &input.env;
     let coinbase = parse_address(&env.current_coinbase, "currentCoinbase")?;
     let ts = parse_u64(&env.current_timestamp, "currentTimestamp")?;
@@ -1158,7 +1172,7 @@ fn parse_block_env(input: &SimplifiedInput) -> Result<BlockEnv, Error> {
 /// RLP-encodes each block, builds pre-state alloc, and computes the last
 /// valid block hash and post-state hash.
 fn assemble_output(
-    input: &SimplifiedInput,
+    input: &Input,
     genesis_bt_header: &BtHeader,
     genesis_consensus: &ConsensusHeader,
     results: &[BlockResult],
@@ -1233,7 +1247,7 @@ fn assemble_output(
 
 /// Build pre-state alloc as `BtAccount` map (for JSON output).
 /// Storage keys are zero-padded 32-byte hex; values use canonical minimal hex.
-fn build_pre_alloc(input: &SimplifiedInput) -> Result<BTreeMap<String, BtAccount>, Error> {
+fn build_pre_alloc(input: &Input) -> Result<BTreeMap<String, BtAccount>, Error> {
     let mut result = BTreeMap::new();
     for (addr_str, acct) in &input.accounts {
         let code = acct.code.as_deref().unwrap_or("0x");
@@ -1304,7 +1318,7 @@ pub unsafe extern "C" fn blocktest_convert(
     let input_bytes = unsafe { std::slice::from_raw_parts(input_ptr, input_len) };
 
     let result = (|| -> Result<String, String> {
-        let input: minimal::SimplifiedInput =
+        let input: minimal::Input =
             serde_json::from_slice(input_bytes).map_err(|e| format!("invalid JSON input: {e}"))?;
         let blocktest = convert(&input).map_err(|e| e.to_string())?;
         serde_json::to_string(&blocktest).map_err(|e| format!("failed to serialize output: {e}"))
@@ -1318,7 +1332,11 @@ pub unsafe extern "C" fn blocktest_convert(
     let len = bytes_vec.len();
     let ptr = bytes_vec.as_mut_ptr();
     std::mem::forget(bytes_vec);
-    BlocktestResult { data: ptr, len, is_err }
+    BlocktestResult {
+        data: ptr,
+        len,
+        is_err,
+    }
 }
 
 /// Free a buffer returned by [`blocktest_convert`].
@@ -1394,7 +1412,7 @@ mod tests {
 
     #[test]
     fn test_convert() {
-        let input: minimal::SimplifiedInput = serde_json::from_str(EXAMPLE_INPUT).unwrap();
+        let input: minimal::Input = serde_json::from_str(EXAMPLE_INPUT).unwrap();
         let result = convert(&input).expect("conversion should succeed");
 
         assert_eq!(result.len(), 1);
@@ -1410,7 +1428,7 @@ mod tests {
     #[test]
     fn test_geth_evm_blocktest() {
         // Convert
-        let input: minimal::SimplifiedInput = serde_json::from_str(EXAMPLE_INPUT).unwrap();
+        let input: minimal::Input = serde_json::from_str(EXAMPLE_INPUT).unwrap();
         let blocktest = convert(&input).expect("conversion should succeed");
         let blocktest_json = serde_json::to_string_pretty(&blocktest).unwrap();
 
@@ -1435,11 +1453,14 @@ mod tests {
         );
 
         // Parse the dump JSON to verify post-state.
-        let dump: serde_json::Value = serde_json::from_str(&stdout)
-            .expect("evm --dump output should be valid JSON");
+        let dump: serde_json::Value =
+            serde_json::from_str(&stdout).expect("evm --dump output should be valid JSON");
 
         let test_result = &dump[0];
-        assert_eq!(test_result["pass"], true, "geth evm should report test as passing");
+        assert_eq!(
+            test_result["pass"], true,
+            "geth evm should report test as passing"
+        );
 
         let accounts = &test_result["state"]["accounts"];
 
@@ -1454,7 +1475,10 @@ mod tests {
 
         // The sender nonce should have incremented.
         let sender_lower = SENDER.to_lowercase();
-        let sender_acct = accounts.as_object().unwrap().iter()
+        let sender_acct = accounts
+            .as_object()
+            .unwrap()
+            .iter()
             .find(|(k, _)| k.to_lowercase() == sender_lower)
             .map(|(_, v)| v)
             .expect("sender should be in post-state");

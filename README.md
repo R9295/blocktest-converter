@@ -34,9 +34,9 @@ To see how it works, look at the [Pipeline](#pipeline) section.
 ### Rust
 
 ```rust
-use blocktest_converter::{convert, minimal::SimplifiedInput};
+use blocktest_converter::{convert, minimal::Input};
 
-let input: SimplifiedInput = serde_json::from_str(&json_string)?;
+let input: Input = serde_json::from_str(&json_string)?;
 let blocktest = convert(&input)?;
 let output = serde_json::to_string_pretty(&blocktest)?;
 ```
@@ -60,7 +60,7 @@ extern BlocktestResult blocktest_convert(const unsigned char *input, unsigned lo
 extern void blocktest_result_free(unsigned char *ptr, unsigned long len);
 
 int main(void) {
-    const char *json = "{...}";  // SimplifiedInput JSON
+    const char *json = "{...}";  // Input JSON
     BlocktestResult r = blocktest_convert((const unsigned char *)json, strlen(json));
     if (r.is_err) {
         fprintf(stderr, "error: %.*s\n", (int)r.len, r.data);
@@ -81,7 +81,7 @@ clang example.c -L target/release -lblocktest_converter -o example
 ## Pipeline
 
 ```
-SimplifiedInput (JSON)
+Input (JSON)
   │
   ├─ 1. Parse fork → select chain spec (Frontier … Osaka)
   ├─ 2. Build genesis header & pre-state
@@ -98,7 +98,7 @@ SimplifiedInput (JSON)
 
 ## Input format
 
-The input is a JSON object matching the `SimplifiedInput` struct. All hex
+The input is a JSON object matching the `Input` struct. All hex
 values use `0x`-prefixed strings.
 
 ```jsonc
@@ -217,7 +217,7 @@ also supported.
 
 ## Example
 
-A complete `SimplifiedInput` that transfers 1 wei from an EOA to a contract
+A complete `Input` that transfers 1 wei from an EOA to a contract
 via an EIP-1559 transaction on Osaka:
 
 ```json
