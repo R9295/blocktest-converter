@@ -51,6 +51,7 @@ use crate::minimal::{MinimalBlock, MinimalTx, SimplifiedInput};
 // Hex parsing helpers
 // ---------------------------------------------------------------------------
 
+/// Strip the `0x` or `0X` prefix from a hex string, returning the bare hex digits.
 fn strip_hex_prefix(value: &str) -> &str {
     value
         .strip_prefix("0x")
@@ -58,6 +59,7 @@ fn strip_hex_prefix(value: &str) -> &str {
         .unwrap_or(value)
 }
 
+/// Parse a hex string into a [`U256`]. Empty or missing digits are treated as zero.
 fn parse_u256(value: &str, field: &str) -> Result<U256, Error> {
     let hex = strip_hex_prefix(value);
     let hex = if hex.is_empty() { "0" } else { hex };
@@ -65,16 +67,19 @@ fn parse_u256(value: &str, field: &str) -> Result<U256, Error> {
         .map_err(|e| Error::ParseError(format!("invalid {field}: {value} ({e})")))
 }
 
+/// Parse a hex string into a `u64`, returning an error on overflow.
 fn parse_u64(value: &str, field: &str) -> Result<u64, Error> {
     let v = parse_u256(value, field)?;
     u64::try_from(v).map_err(|e| Error::ParseError(format!("{field} overflows u64: {e}")))
 }
 
+/// Parse a hex string into a `u128`, returning an error on overflow.
 fn parse_u128(value: &str, field: &str) -> Result<u128, Error> {
     let v = parse_u256(value, field)?;
     u128::try_from(v).map_err(|e| Error::ParseError(format!("{field} overflows u128: {e}")))
 }
 
+/// Parse a hex string into a 20-byte [`Address`].
 fn parse_address(value: &str, field: &str) -> Result<Address, Error> {
     let bytes = hex::decode(strip_hex_prefix(value))
         .map_err(|e| Error::ParseError(format!("invalid {field}: {value} ({e})")))?;
@@ -87,6 +92,7 @@ fn parse_address(value: &str, field: &str) -> Result<Address, Error> {
     Ok(Address::from_slice(&bytes))
 }
 
+/// Parse a hex string into a 32-byte [`B256`] hash.
 fn parse_b256(value: &str, field: &str) -> Result<B256, Error> {
     let bytes = hex::decode(strip_hex_prefix(value))
         .map_err(|e| Error::ParseError(format!("invalid {field}: {value} ({e})")))?;
@@ -99,6 +105,7 @@ fn parse_b256(value: &str, field: &str) -> Result<B256, Error> {
     Ok(B256::from_slice(&bytes))
 }
 
+/// Parse a hex string into arbitrary [`Bytes`], returning empty bytes on decode failure.
 fn parse_bytes(value: &str) -> Bytes {
     let raw = hex::decode(strip_hex_prefix(value)).unwrap_or_default();
     Bytes::from(raw)
@@ -137,7 +144,7 @@ fn hex_b256(h: B256) -> String {
     format!("{h:#x}")
 }
 
-// Header conversion helper (reth ef_tests::Header ↔ reth ConsensusHeader)
+/// Convert an ef-tests [`Header`] (U256 fields) into a reth [`ConsensusHeader`] (u64 fields).
 fn to_consensus_header(header: &Header) -> Result<ConsensusHeader, Error> {
     Ok(ConsensusHeader {
         base_fee_per_gas: header
@@ -180,7 +187,7 @@ fn to_consensus_header(header: &Header) -> Result<ConsensusHeader, Error> {
     })
 }
 
-// Header conversion helper (reth ConsensusHeader -> reth ef_tests::Header)
+/// Convert a reth [`ConsensusHeader`] back into an ef-tests [`Header`].
 fn from_consensus_header(header: &ConsensusHeader) -> Header {
     Header {
         bloom: header.logs_bloom,
@@ -501,6 +508,7 @@ fn build_signed_tx(
 // Block execution result
 // ---------------------------------------------------------------------------
 
+/// The result of processing a single block: header, body, and optional exception.
 #[allow(dead_code)]
 struct BlockResult {
     header: ConsensusHeader,
@@ -509,6 +517,9 @@ struct BlockResult {
     expect_exception: Option<String>,
 }
 
+/// Partial execution state recovered from transactions that succeeded before
+/// an invalid transaction caused the block to fail. Used to populate exception
+/// block headers with realistic roots and gas values.
 #[derive(Debug, Clone, Copy)]
 struct ExceptionExecutionFields {
     state_root: B256,
@@ -978,6 +989,11 @@ pub fn convert(input: &SimplifiedInput) -> Result<BlockTestFile, Error> {
 // Exception block builder (for blocks expected to be invalid)
 // ---------------------------------------------------------------------------
 
+/// Build a [`BlockResult`] for a block that is expected to be invalid.
+///
+/// If `execution_fields` is provided (from partially executing valid prefix
+/// transactions), the header reflects the real state/receipt roots up to the
+/// point of failure. Otherwise, roots default to the parent's values.
 #[allow(clippy::too_many_arguments)]
 fn build_exception_block(
     parent: &ConsensusHeader,
@@ -1060,6 +1076,7 @@ fn build_exception_block(
     }
 }
 
+/// Extract the transaction hash from a [`BlockExecutionError::InvalidTx`] variant, if present.
 fn invalid_tx_hash(err: &reth_evm::execute::BlockExecutionError) -> Option<B256> {
     match err.as_validation() {
         Some(reth_evm::execute::BlockValidationError::InvalidTx { hash, .. }) => Some(*hash),
@@ -1136,6 +1153,10 @@ fn parse_block_env(input: &SimplifiedInput) -> Result<BlockEnv, Error> {
 // Assemble final blocktest JSON
 // ---------------------------------------------------------------------------
 
+/// Assemble the final [`BlockTestFile`] JSON from execution results.
+///
+/// RLP-encodes each block, builds pre-state alloc, and computes the last
+/// valid block hash and post-state hash.
 fn assemble_output(
     input: &SimplifiedInput,
     genesis_bt_header: &BtHeader,

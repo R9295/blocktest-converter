@@ -1,3 +1,4 @@
+/// Errors that can occur during blocktest conversion.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("error parsing: {0}")]
@@ -12,7 +13,7 @@ pub enum Error {
 }
 
 impl Error {
-    /// Create a new [`Error::Provider`] error.
+    /// Create a new [`Error::ProviderError`] from any error type.
     pub fn provider_error(
         err: impl std::error::Error + Send + Sync + 'static,
     ) -> Self {
