@@ -17,7 +17,8 @@ It additionally found two known bugs in Reth and one known edge case in Nethermi
 To see how it works, look at the Pipeline section below. 
 
 ## Usage
-This is a Rust library. Call `convert()` from your Rust code:
+
+### Rust
 
 ```rust
 use blocktest_converter::{convert, minimal::SimplifiedInput};
@@ -25,6 +26,43 @@ use blocktest_converter::{convert, minimal::SimplifiedInput};
 let input: SimplifiedInput = serde_json::from_str(&json_string)?;
 let blocktest = convert(&input)?;
 let output = serde_json::to_string_pretty(&blocktest)?;
+```
+
+### C / FFI
+
+The crate builds a shared library (`libblocktest_converter.so`) with a C API.
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+// From blocktest_converter.h
+typedef struct {
+    unsigned char *data;
+    unsigned long  len;
+    int            is_err;  // 0 = success, 1 = error
+} BlocktestResult;
+
+extern BlocktestResult blocktest_convert(const unsigned char *input, unsigned long len);
+extern void blocktest_result_free(unsigned char *ptr, unsigned long len);
+
+int main(void) {
+    const char *json = "{...}";  // SimplifiedInput JSON
+    BlocktestResult r = blocktest_convert((const unsigned char *)json, strlen(json));
+    if (r.is_err) {
+        fprintf(stderr, "error: %.*s\n", (int)r.len, r.data);
+    } else {
+        fwrite(r.data, 1, r.len, stdout);
+    }
+    blocktest_result_free(r.data, r.len);
+    return r.is_err;
+}
+```
+
+Compile with:
+```bash
+cargo build --release
+clang example.c -L target/release -lblocktest_converter -o example
 ```
 
 ## Pipeline

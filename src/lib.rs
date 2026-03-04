@@ -4,9 +4,9 @@
 //! Pipeline: parse minimal → build genesis → sign txs → execute blocks via
 //! reth EVM → compute state roots → assemble blocktest JSON.
 
-mod blocktest;
-mod error;
-mod minimal;
+pub mod blocktest;
+pub mod error;
+pub mod minimal;
 
 use std::collections::BTreeMap;
 
@@ -1258,4 +1258,79 @@ fn build_pre_alloc(input: &SimplifiedInput) -> Result<BTreeMap<String, BtAccount
         );
     }
     Ok(result)
+}
+
+// ---------------------------------------------------------------------------
+// FFI bindings
+// ---------------------------------------------------------------------------
+
+/// Result of an FFI conversion call.
+///
+/// - On success: `data` points to a UTF-8 JSON string, `len` is the byte
+///   count, and `is_err` is `0`.
+/// - On error: `data` points to a UTF-8 error message, `len` is the byte
+///   count of the message, and `is_err` is `1`.
+///
+/// The caller must free `data` by passing it (along with `len`) to
+/// [`blocktest_result_free`].
+#[repr(C)]
+pub struct BlocktestResult {
+    /// Pointer to a UTF-8 byte buffer (not null-terminated).
+    pub data: *mut u8,
+    /// Length of the buffer in bytes.
+    pub len: usize,
+    /// `0` on success, `1` on error.
+    pub is_err: i32,
+}
+
+/// Convert a simplified JSON input into a blocktest JSON string.
+///
+/// # Parameters
+/// - `input_ptr`: pointer to a UTF-8 JSON byte buffer.
+/// - `input_len`: length of the buffer in bytes.
+///
+/// # Returns
+/// A [`BlocktestResult`]. On success, `data`/`len` contain the blocktest JSON
+/// and `is_err` is 0. On error, `data`/`len` contain the error message and
+/// `is_err` is 1.
+///
+/// # Safety
+/// `input_ptr` must point to `input_len` readable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn blocktest_convert(
+    input_ptr: *const u8,
+    input_len: usize,
+) -> BlocktestResult {
+    let input_bytes = unsafe { std::slice::from_raw_parts(input_ptr, input_len) };
+
+    let result = (|| -> Result<String, String> {
+        let input: minimal::SimplifiedInput =
+            serde_json::from_slice(input_bytes).map_err(|e| format!("invalid JSON input: {e}"))?;
+        let blocktest = convert(&input).map_err(|e| e.to_string())?;
+        serde_json::to_string(&blocktest).map_err(|e| format!("failed to serialize output: {e}"))
+    })();
+
+    let (bytes_vec, is_err) = match result {
+        Ok(json) => (json.into_bytes(), 0),
+        Err(msg) => (msg.into_bytes(), 1),
+    };
+    let mut bytes_vec = bytes_vec;
+    let len = bytes_vec.len();
+    let ptr = bytes_vec.as_mut_ptr();
+    std::mem::forget(bytes_vec);
+    BlocktestResult { data: ptr, len, is_err }
+}
+
+/// Free a buffer returned by [`blocktest_convert`].
+///
+/// # Safety
+/// `ptr` must have been returned by a previous call to `blocktest_convert`,
+/// and `len` must be the corresponding `BlocktestResult::len`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn blocktest_result_free(ptr: *mut u8, len: usize) {
+    if !ptr.is_null() && len > 0 {
+        unsafe {
+            drop(Vec::from_raw_parts(ptr, len, len));
+        }
+    }
 }
