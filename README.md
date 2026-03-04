@@ -3,19 +3,20 @@
 Converts a fuzzer-friendly input structure into Ethereum's [Block Test](https://ethereum-tests.readthedocs.io/en/v6.0.0-beta.1/test_types/blockchain_tests.html) format -- the standard format consumed by geth, besu, Nethermind, reth and other EL clients.
 
 Block tests allow testing of the entire block processing pipeline, from validation, execution to state commitment.
-It is a powerful primitive for testing the adherence of EL clients.
-To see how it works, look at the Pipeline section below. 
+It is a powerful primitive for testing the adherence of EL clients to a specification.
+
 This library does a best effort at generating valid blocks. Thus, if you wish to test block validation primitives, you'd need to modify the resulting block test.
 
-Fuzzing with this library has already found three bugs.
+Fuzzing with this library has already found three novel bugs.
 - [Besu #1](https://github.com/hyperledger/besu/issues/9840)
 - [Besu #2](https://github.com/hyperledger/besu/issues/9868)
 - Potential security impact, currently being triaged..
 
-Currently, it only supports Rust.
+It additionally found two known bugs in Reth and one known edge case in Nethermind.
+
+To see how it works, look at the Pipeline section below. 
 
 ## Usage
-
 This is a Rust library. Call `convert()` from your Rust code:
 
 ```rust
