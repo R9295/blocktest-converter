@@ -1,0 +1,35 @@
+[package]
+name = "blocktest-converter"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+hex = "0.4.3"
+serde_json = "1.0.149"
+
+# alloy
+alloy-consensus = "1.7.3"
+alloy-eips = "1.7.3"
+alloy-genesis = "1.7.3"
+alloy-primitives = "1.5.7"
+alloy-rlp = "0.3.13"
+
+# reth
+reth-chainspec = { path = "./reth/crates/chainspec", default-features = false }
+reth-ethereum-primitives = { path = "./reth/crates/ethereum/primitives", default-features = false }
+reth-primitives-traits = { path = "./reth/crates/primitives-traits", features = ["rayon"]}
+reth-consensus = { path = "./reth/crates/consensus/consensus", default-features = false }
+reth-db = { path = "./reth/crates/storage/db", features = ["mdbx", "test-utils", "disable-lock"] }
+reth-db-api = { path = "./reth/crates/storage/db-api" }
+reth-db-common = { path = "./reth/crates/storage/db-common" }
+reth-provider = { path = "./reth/crates/storage/provider", features = ["test-utils"]  }
+reth-evm = { path = "./reth/crates/evm/evm", default-features = false }
+reth-evm-ethereum = { path = "./reth/crates/ethereum/evm", default-features = false }
+reth-ethereum-consensus = { path = "./reth/crates/ethereum/consensus", default-features = false }
+reth-revm = { path = "./reth/crates/revm", default-features = false }
+reth-trie = { path = "./reth/crates/trie/trie" }
+reth-trie-db = { path = "./reth/crates/trie/db" }
+revm = { version = "34.0.0", features = ["secp256k1", "blst", "c-kzg", "memory_limit"]}
+ef-tests = {path = "./reth/testing/ef-tests/"}
+thiserror = "2.0.18"
