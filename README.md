@@ -1,9 +1,30 @@
 # blocktest-converter
 
-Converts a simplified JSON input into Ethereum execution-layer block tests — the
-standard format consumed by geth, besu, Nethermind, EthereumJS, and other EL
-clients. This is the Rust equivalent of the Go `evm blocktest --run convert`
-command.
+Converts a fuzzer-friendly input structure into Ethereum's [Block Test](https://ethereum-tests.readthedocs.io/en/v6.0.0-beta.1/test_types/blockchain_tests.html) format -- the standard format consumed by geth, besu, Nethermind, reth and other EL clients.
+
+Block tests allow testing of the entire block processing pipeline, from validation, execution to state commitment.
+It is a powerful primitive for testing the adherence of EL clients.
+To see how it works, look at the Pipeline section below. 
+This library does a best effort at generating valid blocks. Thus, if you wish to test block validation primitives, you'd need to modify the resulting block test.
+
+Fuzzing with this library has already found three bugs.
+- [Besu #1](https://github.com/hyperledger/besu/issues/9840)
+- [Besu #2](https://github.com/hyperledger/besu/issues/9868)
+- Potential security impact, currently being triaged..
+
+Currently, it only supports Rust.
+
+## Usage
+
+This is a Rust library. Call `convert()` from your Rust code:
+
+```rust
+use blocktest_converter::{convert, minimal::SimplifiedInput};
+
+let input: SimplifiedInput = serde_json::from_str(&json_string)?;
+let blocktest = convert(&input)?;
+let output = serde_json::to_string_pretty(&blocktest)?;
+```
 
 ## Pipeline
 
@@ -49,7 +70,7 @@ values use `0x`-prefixed strings.
       "nonce":   "0x0",
       "code":    "0x",                      // optional, omit for EOAs
       "storage": {},                        // slot → value mapping
-      "privateKey": "0xabcdef..."           // optional, required for signers
+      "privateKey": "0xabcdef..."           // optional, required for signers or senders
     },
     "0xCONTRACT": {
       "balance": "0x0",
@@ -133,19 +154,6 @@ Transactions are signed automatically using the sender's `privateKey` from the
 accounts map. EIP-7702 authorizations are signed using the `signer` field,
 which references an account address that must have a `privateKey`.
 
-## Output format
-
-The output is a standard `BlockTestFile` — a JSON map from test name to
-`BlockTest`. Each test contains:
-
-- `genesisBlockHeader` — the genesis block header with computed state root
-- `pre` — pre-state accounts (balance, nonce, code, storage)
-- `blocks` — list of blocks with RLP encoding and headers
-- `postStateHash` — state root after the last valid block
-- `lastblockhash` — hash of the last valid block
-- `network` — fork name
-- `sealEngine` — always `"NoProof"`
-
 ## Supported forks
 
 Frontier, Homestead, EIP150, EIP158, Byzantium, Constantinople,
@@ -154,24 +162,3 @@ Prague, Osaka.
 
 Transition forks (e.g. `BerlinToLondonAt5`, `ShanghaiToCancunAtTime15k`) are
 also supported.
-
-## Building
-
-```bash
-cargo build --release
-```
-
-Requires a C compiler for native dependencies (libmdbx, blst, c-kzg,
-secp256k1).
-
-## Usage
-
-This is a library crate. Call `convert()` from your Rust code:
-
-```rust
-use blocktest_converter::{convert, minimal::SimplifiedInput};
-
-let input: SimplifiedInput = serde_json::from_str(&json_string)?;
-let blocktest = convert(&input)?;
-let output = serde_json::to_string_pretty(&blocktest)?;
-```
