@@ -1,4 +1,5 @@
 # blocktest-converter
+blocktest-converter is an Ethereum BlockTest test fixture generator from a fuzzer friendly input structure.
 
 ## Table of contents
 
