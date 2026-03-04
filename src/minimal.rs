@@ -82,8 +82,8 @@ pub struct MinimalTx {
     pub to: Option<String>,
     pub value: String,
     pub gas: String,
-    #[serde(rename = "gasPrice")]
-    pub gas_price: String,
+    #[serde(rename = "gasPrice", default, skip_serializing_if = "Option::is_none")]
+    pub gas_price: Option<String>,
     pub nonce: String,
     pub data: String,
     #[serde(rename = "accessList", default, skip_serializing_if = "Option::is_none")]
@@ -91,15 +91,11 @@ pub struct MinimalTx {
     /// EIP-2718 transaction type: 0=legacy, 1=access-list, 2=dynamic-fee, 3=blob, 4=set-code.
     pub tx_type: u8,
     /// Max priority fee (tip) for type-2/3/4 txs.
-    #[serde(
-        rename = "maxPriorityFee",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub max_priority_fee: Option<String>,
+    #[serde(rename = "maxPriorityFee")]
+    pub max_priority_fee: String,
     /// Max fee per gas for type-2/3/4 txs.
-    #[serde(rename = "maxFee", default, skip_serializing_if = "Option::is_none")]
-    pub max_fee: Option<String>,
+    #[serde(rename = "maxFee")]
+    pub max_fee: String,
     /// Max fee per blob gas for type-3 (blob) txs.
     #[serde(
         rename = "maxFeePerBlobGas",
@@ -138,9 +134,8 @@ pub struct MinimalAuthorization {
     pub chain_id: String,
     pub address: String,
     pub nonce: String,
-    pub v: String,
-    pub r: String,
-    pub s: String,
+    /// Address of the signer account (must have a `privateKey` in the accounts map).
+    pub signer: String,
 }
 
 /// Environment settings.

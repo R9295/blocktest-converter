@@ -18,7 +18,7 @@ use alloy_eips::eip2930::{AccessList, AccessListItem};
 use alloy_eips::eip4895::Withdrawal;
 use alloy_eips::eip7702::Authorization;
 use alloy_genesis::GenesisAccount;
-use alloy_primitives::{Address, Bloom, Bytes, FixedBytes, Signature, B256, U256};
+use alloy_primitives::{Address, Bloom, Bytes, FixedBytes, B256, U256};
 use alloy_rlp::Encodable;
 use ef_tests::models::{ForkSpec, Header};
 use reth_chainspec::EthChainSpec;
@@ -288,7 +288,6 @@ fn build_signed_tx(
     let nonce = parse_u64(&tx.nonce, "tx nonce")?;
     let gas_limit = parse_u64(&tx.gas, "tx gas")?;
     let value = parse_u256(&tx.value, "tx value")?;
-    let gas_price = parse_u128(&tx.gas_price, "tx gasPrice")?;
     let tx_chain_id = parse_u64(&tx.chain_id, "tx chainId")?;
     let data = parse_bytes(&tx.data);
     let to = match &tx.to {
@@ -300,17 +299,13 @@ fn build_signed_tx(
         .as_deref()
         .unwrap_or(&[])
         .iter()
-        .enumerate()
-        .map(|(idx, entry)| {
+        .map(|entry| {
             let address = parse_address(&entry.address, "tx accessList address")?;
             let storage_keys = entry
                 .storage_keys
                 .iter()
                 .map(|key| parse_b256(key, "tx accessList storage key"))
                 .collect::<Result<Vec<_>, _>>()?;
-            if entry.storage_keys.len() != storage_keys.len() {
-                return Err(Error::ConversionFailure(format!("invalid accessList entry at index {idx}")));
-            }
             Ok(AccessListItem {
                 address,
                 storage_keys,
@@ -326,6 +321,10 @@ fn build_signed_tx(
     let transaction: Transaction = match resolved_tx_type {
         0 => {
             // Legacy
+            let gas_price = parse_u128(
+                tx.gas_price.as_deref().ok_or_else(|| Error::ConversionFailure("type 0 tx missing gasPrice".to_string()))?,
+                "tx gasPrice",
+            )?;
             TxLegacy {
                 chain_id: legacy_chain_id,
                 nonce,
@@ -339,6 +338,10 @@ fn build_signed_tx(
         }
         1 => {
             // EIP-2930 access list
+            let gas_price = parse_u128(
+                tx.gas_price.as_deref().ok_or_else(|| Error::ConversionFailure("type 1 tx missing gasPrice".to_string()))?,
+                "tx gasPrice",
+            )?;
             TxEip2930 {
                 chain_id: typed_chain_id,
                 nonce,
@@ -353,18 +356,8 @@ fn build_signed_tx(
         }
         2 => {
             // EIP-1559 dynamic fee
-            let tip = tx
-                .max_priority_fee
-                .as_deref()
-                .map(|v| parse_u128(v, "maxPriorityFee"))
-                .transpose()?
-                .unwrap_or(0);
-            let fee_cap = tx
-                .max_fee
-                .as_deref()
-                .map(|v| parse_u128(v, "maxFee"))
-                .transpose()?
-                .unwrap_or(gas_price);
+            let tip = parse_u128(&tx.max_priority_fee, "maxPriorityFee")?;
+            let fee_cap = parse_u128(&tx.max_fee, "maxFee")?;
             TxEip1559 {
                 chain_id: typed_chain_id,
                 nonce,
@@ -380,29 +373,19 @@ fn build_signed_tx(
         }
         3 => {
             // EIP-4844 blob
-            let tip = tx
-                .max_priority_fee
-                .as_deref()
-                .map(|v| parse_u128(v, "maxPriorityFee"))
-                .transpose()?
-                .unwrap_or(0);
-            let fee_cap = tx
-                .max_fee
-                .as_deref()
-                .map(|v| parse_u128(v, "maxFee"))
-                .transpose()?
-                .unwrap_or(gas_price);
+            let tip = parse_u128(&tx.max_priority_fee, "maxPriorityFee")?;
+            let fee_cap = parse_u128(&tx.max_fee, "maxFee")?;
             let blob_fee_cap = tx
                 .max_fee_per_blob_gas
                 .as_deref()
                 .map(|v| parse_u128(v, "maxFeePerBlobGas"))
                 .transpose()?
                 .unwrap_or(0);
-            // Blob tx `to` must be an Address, not TxKind
-            let to_addr = match &tx.to {
-                Some(a) => parse_address(a, "tx to")?,
-                None => parse_address(&tx.from, "tx from")?,
-            };
+            // Blob tx `to` must be an Address (contract creation not allowed per EIP-4844)
+            let to_addr = parse_address(
+                tx.to.as_deref().ok_or_else(|| Error::ConversionFailure("type 3 (blob) tx requires a `to` address".to_string()))?,
+                "tx to",
+            )?;
             let blob_hashes = tx
                 .blob_versioned_hashes
                 .as_deref()
@@ -427,22 +410,13 @@ fn build_signed_tx(
         }
         4 => {
             // EIP-7702 set-code
-            let tip = tx
-                .max_priority_fee
-                .as_deref()
-                .map(|v| parse_u128(v, "maxPriorityFee"))
-                .transpose()?
-                .unwrap_or(0);
-            let fee_cap = tx
-                .max_fee
-                .as_deref()
-                .map(|v| parse_u128(v, "maxFee"))
-                .transpose()?
-                .unwrap_or(gas_price);
-            let to_addr = match &tx.to {
-                Some(a) => parse_address(a, "tx to")?,
-                None => parse_address(&tx.from, "tx from")?,
-            };
+            let tip = parse_u128(&tx.max_priority_fee, "maxPriorityFee")?;
+            let fee_cap = parse_u128(&tx.max_fee, "maxFee")?;
+            // Set-code tx `to` must be an Address (contract creation not allowed per EIP-7702)
+            let to_addr = parse_address(
+                tx.to.as_deref().ok_or_else(|| Error::ConversionFailure("type 4 (set-code) tx requires a `to` address".to_string()))?,
+                "tx to",
+            )?;
             let auth_list = tx
                 .authorization_list
                 .as_deref()
@@ -452,20 +426,31 @@ fn build_signed_tx(
                     let auth_chain_id = parse_u256(&a.chain_id, "auth chainId")?;
                     let address = parse_address(&a.address, "auth address")?;
                     let auth_nonce = parse_u64(&a.nonce, "auth nonce")?;
-                    let v_raw = parse_u64(&a.v, "auth v")?;
-                    let r_val = parse_u256(&a.r, "auth r")?;
-                    let s_val = parse_u256(&a.s, "auth s")?;
                     let auth = Authorization {
                         chain_id: auth_chain_id,
                         address,
                         nonce: auth_nonce,
                     };
-                    let y_parity = if v_raw == 27 || v_raw == 28 {
-                        v_raw == 28
-                    } else {
-                        (v_raw & 1) == 1
-                    };
-                    let sig = Signature::new(r_val, s_val, y_parity);
+                    let signer_acct = input
+                        .accounts
+                        .get(&a.signer)
+                        .ok_or_else(|| Error::ConversionFailure(format!("auth signer {} not found", a.signer)))?;
+                    let signer_pk_hex = signer_acct
+                        .private_key
+                        .as_deref()
+                        .ok_or_else(|| Error::ConversionFailure(format!("auth signer {} missing private key", a.signer)))?;
+                    let signer_pk_bytes = hex::decode(strip_hex_prefix(signer_pk_hex))
+                        .map_err(|e| Error::ConversionFailure(format!("invalid auth signer private key: {e}")))?;
+                    if signer_pk_bytes.len() != 32 {
+                        return Err(Error::ConversionFailure(format!(
+                            "auth signer {} private key must be 32 bytes, got {}",
+                            a.signer,
+                            signer_pk_bytes.len()
+                        )));
+                    }
+                    let signer_pk = B256::from_slice(&signer_pk_bytes);
+                    let sig = sign_message(signer_pk, auth.signature_hash())
+                        .map_err(|e| Error::ConversionFailure(format!("auth signing failed: {e}")))?;
                     Ok(auth.into_signed(sig))
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -496,6 +481,13 @@ fn build_signed_tx(
         .ok_or_else(|| Error::ConversionFailure(format!("sender {} missing private key", tx.from)))?;
     let pk_bytes = hex::decode(strip_hex_prefix(pk_hex))
         .map_err(|e| Error::ConversionFailure(format!("invalid private key: {e}")))?;
+    if pk_bytes.len() != 32 {
+        return Err(Error::ConversionFailure(format!(
+            "private key for {} must be 32 bytes, got {}",
+            tx.from,
+            pk_bytes.len()
+        )));
+    }
     let private_key = B256::from_slice(&pk_bytes);
     let sig_hash = transaction.signature_hash();
     let signature = sign_message(private_key, sig_hash)
@@ -541,7 +533,9 @@ pub fn convert(input: &SimplifiedInput) -> Result<BlockTestFile, Error> {
     if input.blocks.is_empty() {
         return Err(Error::ConversionFailure("input has no blocks".to_string()));
     }
-    let chain_spec = ForkSpec::Osaka.to_chain_spec();
+    let fork_spec: ForkSpec = serde_json::from_value(serde_json::Value::String(input.fork.clone()))
+        .map_err(|_| Error::ConversionFailure(format!("unsupported fork: {}", input.fork)))?;
+    let chain_spec = fork_spec.to_chain_spec();
     // --- Build genesis header from chain spec defaults + env overrides ---
     let mut genesis_ef_header = from_consensus_header(chain_spec.genesis_header());
     apply_env_to_genesis(&mut genesis_ef_header, input)?;
@@ -976,6 +970,7 @@ pub fn convert(input: &SimplifiedInput) -> Result<BlockTestFile, Error> {
         &genesis_bt_header,
         &genesis_consensus,
         &block_results,
+        &input.fork,
     )
 }
 
@@ -1146,6 +1141,7 @@ fn assemble_output(
     genesis_bt_header: &BtHeader,
     genesis_consensus: &ConsensusHeader,
     results: &[BlockResult],
+    fork_name: &str,
 ) -> Result<BlockTestFile, Error> {
     // Pre-state accounts
     let pre = build_pre_alloc(input)?;
@@ -1205,7 +1201,7 @@ fn assemble_output(
         post_state: None,
         post_state_hash: Some(hex_b256(post_state_hash)),
         lastblockhash: hex_b256(last_hash),
-        network: "Osaka".to_string(),
+        network: fork_name.to_string(),
         seal_engine: Some("NoProof".to_string()),
     };
 
