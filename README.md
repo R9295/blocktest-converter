@@ -1,5 +1,5 @@
 # blocktest-converter
-blocktest-converter is an Ethereum BlockTest test fixture generator from a fuzzer friendly input structure.
+blocktest-converter is an Ethereum BlockTest test fixture generator from a fuzzer friendly input structure. 
 
 ## Table of contents
 
@@ -12,21 +12,19 @@ blocktest-converter is an Ethereum BlockTest test fixture generator from a fuzze
 - [Supported forks](#supported-forks)
 
 # About
-It is extremely difficult to generate good blocktests when fuzzing as all the hash and root computations in the header's block require execution of the all the transactions. Then comes the precise consturction of the test to make sure it adheres to the block test format.
+It is extremely difficult to generate valid blocktests when fuzzing as all the hash and root computations in the block's header require actual processing of the block. One bad hash or calculation and the block will be rejected before immediately, preventing us from testing anything meaningful.
+Adding to the difficulty, comes the precise consturction of the test fixture. No surprises, clients have subtle differences in how they parse the test format. This results in false positives or a waste of fuzzer time and compute.
 
-This library aims to solve both problems and to the best of my knowledge, is the only library based, documented implementation.
+This library aims to solve both problems and to the best of my knowledge, is the only library-based, spec-compliant and documented implementation.
 
-Essentially, it converts a fuzzer-friendly input structure into Ethereum's [Block Test](https://ethereum-tests.readthedocs.io/en/v6.0.0-beta.1/test_types/blockchain_tests.html) format -- the standard format consumed by geth, besu, Nethermind, reth and other EL clients.
+Block tests allow testing of the entire block processing pipeline, from validation, execution to state commitment. It is a powerful primitive for testing the compliance of EL clients.
 
-Block tests allow testing of the entire block processing pipeline, from validation, execution to state commitment.
-It is a powerful primitive for testing the adherence of EL clients to a specification.
-
-Fuzzing with this library has already found three novel bugs.
+Fuzzing with this library has already found three novel bugs (Osaka).
 - [Besu #1](https://github.com/hyperledger/besu/issues/9840)
 - [Besu #2](https://github.com/hyperledger/besu/issues/9868)
 - Potential security impact, currently being triaged..
 
-It additionally found two known bugs in Reth and one known potential edge case in Nethermind. These were not submitted but are mentioned since it shows that the converter is able to reach known issues via a fuzzer.
+It additionally found two known bugs in Reth (create collision with empty accounts, max nonce overflow) and one known pedge case in Nethermind  which is currently untriggerable (if a deposit contract touches an empty account, state roots will differ). These were not submitted but are mentioned since it shows that the converter is able to reach known issues via a fuzzer.
 
 To see how it works, look at the [Pipeline](#pipeline) section.
 
