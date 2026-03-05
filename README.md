@@ -29,12 +29,12 @@ This library aims to solve both problems and to the best of my knowledge, is the
 
 Block tests allow testing of the entire block processing pipeline, from validation, execution to state commitment. It is a powerful primitive for testing the compliance of EL clients.
 
-Fuzzing with this library has already found three novel bugs (Osaka).
+Fuzzing with this library has already found two novel bugs (Osaka).
 - [Besu #1](https://github.com/hyperledger/besu/issues/9840)
 - [Besu #2](https://github.com/hyperledger/besu/issues/9868)
-- Potential security impact, currently being triaged..
 
-It additionally found two known bugs in Reth (create collision with empty accounts, max nonce overflow) and one known edge case in Nethermind  which is currently untriggerable (if a deposit contract touches an empty account, state roots will differ). These were not submitted but are mentioned since it shows that the converter is able to reach known issues via a fuzzer.
+It additionally found two known bugs in Reth (create collision with empty accounts, max nonce overflow) and one known edge case in Nethermind which is known and untriggerable (if a deposit contract touches an empty account, state roots will differ). 
+These were not submitted but are mentioned since it shows that the converter is able to reach known issues via a fuzzer.
 
 ## Usage
 
