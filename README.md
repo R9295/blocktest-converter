@@ -49,7 +49,10 @@ let blocktest = convert(fuzzer_input)?;
 let output = serde_json::to_string_pretty(&blocktest)?;
 std::fs::write("/tmp/blocktest.json", output)?;
 ```
-
+Then, using the EVM binary from go-ethereum
+``` bash
+evm blocktest /tmp/blocktest.json
+```
 ### C / FFI
 
 The crate builds a shared library (`libblocktest_converter.so`) with a C API.
