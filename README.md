@@ -1,7 +1,7 @@
 <img align="right" src="evm.jpeg" alt="logo" width="300" heigh="300">
 
 # blocktest-converter
-blocktest-converter is an Ethereum BlockTest test fixture generator from a fuzzer friendly input structure.
+blocktest-converter is an Ethereum [BlockTest](https://ethereum-tests.readthedocs.io/en/v6.0.0-beta.1/test_types/blockchain_tests.html) test fixture generator from a fuzzer friendly input structure.
 
 ## Table of contents
 
@@ -27,7 +27,7 @@ Fuzzing with this library has already found three novel bugs (Osaka).
 - [Besu #2](https://github.com/hyperledger/besu/issues/9868)
 - Potential security impact, currently being triaged..
 
-It additionally found two known bugs in Reth (create collision with empty accounts, max nonce overflow) and one known pedge case in Nethermind  which is currently untriggerable (if a deposit contract touches an empty account, state roots will differ). These were not submitted but are mentioned since it shows that the converter is able to reach known issues via a fuzzer.
+It additionally found two known bugs in Reth (create collision with empty accounts, max nonce overflow) and one known edge case in Nethermind  which is currently untriggerable (if a deposit contract touches an empty account, state roots will differ). These were not submitted but are mentioned since it shows that the converter is able to reach known issues via a fuzzer.
 
 To see how it works, look at the [Pipeline](#pipeline) section.
 
