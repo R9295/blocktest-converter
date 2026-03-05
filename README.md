@@ -44,7 +44,7 @@ It additionally found two known bugs in Reth (create collision with empty accoun
 ```rust
 use blocktest_converter::convert;
 
-let fuzzer_input = "{...}"; // see the example input fixutre
+let fuzzer_input = "{...}"; // see the example input fixture.
 let blocktest = convert(fuzzer_input)?;
 // this is the block test we can run block tests with (eg. evm blocktest ./output.json).
 let output = serde_json::to_string_pretty(&blocktest)?;
