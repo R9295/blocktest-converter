@@ -10,6 +10,7 @@ blocktest-converter is an Ethereum BlockTest test fixture generator from a fuzze
   - [Transaction types](#transaction-types)
   - [Signing](#signing)
 - [Supported forks](#supported-forks)
+- [Example Input](#example)
 
 # About
 It is extremely difficult to generate valid blocktests when fuzzing as all the hash and root computations in the block's header require actual processing of the block. One bad hash or calculation and the block will be rejected before immediately, preventing us from testing anything meaningful.
