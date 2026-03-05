@@ -5,13 +5,11 @@
 blocktest-converter is an Ethereum [BlockTest](https://ethereum-tests.readthedocs.io/en/v6.0.0-beta.1/test_types/blockchain_tests.html) test fixture generator from a fuzzer friendly input structure.
 &nbsp;  
 
-&nbsp; 
-
 To see how it works, look at the [Pipeline](#pipeline) section.  
 To see the input format, look at the [Input Format](#input-format) section.  
 To see an example input, look at the [Example](#example) section.  
 &nbsp;  
-
+&nbsp;  
 ## Table of contents
 - [About](#about)
 - [Usage](#usage)
