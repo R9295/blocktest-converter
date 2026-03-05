@@ -15,10 +15,10 @@ To see an example input, look at the [Example](#example) section.
 - [Usage](#usage)
 - [Pipeline](#pipeline)
 - [Input format](#input-format)
+  - [Example Input](#example)
   - [Transaction types](#transaction-types)
   - [Signing](#signing)
 - [Supported forks](#supported-forks)
-- [Example Input](#example)
 
 # About
 It is extremely difficult to generate valid blocktests when fuzzing as all the hash and root computations in the block's header require actual processing of the block. One bad hash or calculation and the block will be rejected immediately, preventing us from testing anything meaningful.
