@@ -548,13 +548,25 @@ struct ExceptionExecutionFields {
 // Public conversion entry point
 // ---------------------------------------------------------------------------
 
-/// Convert a `Input` into a `BlockTestFile`.
+/// Convert a JSON string into a `BlockTestFile`.
+///
+/// Parses the input as an [`Input`], then builds genesis, signs txs,
+/// executes blocks through reth's EVM, computes state roots, and assembles
+/// the blocktest JSON output.
+#[allow(clippy::too_many_lines)]
+pub fn convert(json: &str) -> Result<BlockTestFile, Error> {
+    let input: Input = serde_json::from_str(json)
+        .map_err(|e| Error::ParseError(format!("invalid JSON input: {e}")))?;
+    convert_input(&input)
+}
+
+/// Convert an [`Input`] into a `BlockTestFile`.
 ///
 /// Builds genesis, signs txs,
 /// executes blocks through reth's EVM, computes state roots, and assembles
 /// the blocktest JSON output.
 #[allow(clippy::too_many_lines)]
-pub fn convert(input: &Input) -> Result<BlockTestFile, Error> {
+pub fn convert_input(input: &Input) -> Result<BlockTestFile, Error> {
     if input.blocks.is_empty() {
         return Err(Error::ConversionFailure("input has no blocks".to_string()));
     }
@@ -1318,9 +1330,9 @@ pub unsafe extern "C" fn blocktest_convert(
     let input_bytes = unsafe { std::slice::from_raw_parts(input_ptr, input_len) };
 
     let result = (|| -> Result<String, String> {
-        let input: minimal::Input =
-            serde_json::from_slice(input_bytes).map_err(|e| format!("invalid JSON input: {e}"))?;
-        let blocktest = convert(&input).map_err(|e| e.to_string())?;
+        let input_str = std::str::from_utf8(input_bytes)
+            .map_err(|e| format!("invalid UTF-8 input: {e}"))?;
+        let blocktest = convert(input_str).map_err(|e| e.to_string())?;
         serde_json::to_string(&blocktest).map_err(|e| format!("failed to serialize output: {e}"))
     })();
 
@@ -1412,8 +1424,7 @@ mod tests {
 
     #[test]
     fn test_convert() {
-        let input: minimal::Input = serde_json::from_str(EXAMPLE_INPUT).unwrap();
-        let result = convert(&input).expect("conversion should succeed");
+        let result = convert(EXAMPLE_INPUT).expect("conversion should succeed");
 
         assert_eq!(result.len(), 1);
         let test = result.values().next().unwrap();
@@ -1428,8 +1439,7 @@ mod tests {
     #[test]
     fn test_geth_evm_blocktest() {
         // Convert
-        let input: minimal::Input = serde_json::from_str(EXAMPLE_INPUT).unwrap();
-        let blocktest = convert(&input).expect("conversion should succeed");
+        let blocktest = convert(EXAMPLE_INPUT).expect("conversion should succeed");
         let blocktest_json = serde_json::to_string_pretty(&blocktest).unwrap();
 
         // Write to temp file
