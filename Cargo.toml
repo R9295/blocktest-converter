@@ -19,22 +19,22 @@ alloy-primitives = "1.5.7"
 alloy-rlp = "0.3.13"
 
 # reth
-reth-chainspec = { path = "./reth/crates/chainspec", default-features = false }
-reth-ethereum-primitives = { path = "./reth/crates/ethereum/primitives", default-features = false }
-reth-primitives-traits = { path = "./reth/crates/primitives-traits", features = ["rayon"]}
-reth-consensus = { path = "./reth/crates/consensus/consensus", default-features = false }
-reth-db = { path = "./reth/crates/storage/db", features = ["mdbx", "test-utils", "disable-lock"] }
-reth-db-api = { path = "./reth/crates/storage/db-api" }
-reth-db-common = { path = "./reth/crates/storage/db-common" }
-reth-provider = { path = "./reth/crates/storage/provider", features = ["test-utils"]  }
-reth-evm = { path = "./reth/crates/evm/evm", default-features = false }
-reth-evm-ethereum = { path = "./reth/crates/ethereum/evm", default-features = false }
-reth-ethereum-consensus = { path = "./reth/crates/ethereum/consensus", default-features = false }
-reth-revm = { path = "./reth/crates/revm", default-features = false }
-reth-trie = { path = "./reth/crates/trie/trie" }
-reth-trie-db = { path = "./reth/crates/trie/db" }
+reth-chainspec = { git = "https://github.com/paradigmxyz/reth", default-features = false }
+reth-ethereum-primitives = { git = "https://github.com/paradigmxyz/reth", default-features = false }
+reth-primitives-traits = { git = "https://github.com/paradigmxyz/reth", features = ["rayon"]}
+reth-consensus = { git = "https://github.com/paradigmxyz/reth", default-features = false }
+reth-db = { git = "https://github.com/paradigmxyz/reth", features = ["disable-lock"] }
+reth-db-api = { git = "https://github.com/paradigmxyz/reth", }
+reth-db-common = { git = "https://github.com/paradigmxyz/reth", }
+reth-provider = { git = "https://github.com/paradigmxyz/reth", features = ["test-utils"]  }
+reth-evm = { git = "https://github.com/paradigmxyz/reth", default-features = false }
+reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", default-features = false }
+reth-ethereum-consensus = { git = "https://github.com/paradigmxyz/reth", default-features = false }
+reth-revm = { git = "https://github.com/paradigmxyz/reth", default-features = false }
+reth-trie = { git = "https://github.com/paradigmxyz/reth" }
+reth-trie-db = { git = "https://github.com/paradigmxyz/reth"}
 revm = { version = "34.0.0", features = ["secp256k1", "blst", "c-kzg", "memory_limit"]}
-ef-tests = {path = "./reth/testing/ef-tests/"}
+ef-tests = {git = "https://github.com/paradigmxyz/reth",}
 thiserror = "2.0.18"
 
 [dev-dependencies]

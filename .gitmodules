@@ -1,3 +1,0 @@
-[submodule "reth"]
-	path = reth
-	url = git@github.com:R9295/converter-reth
