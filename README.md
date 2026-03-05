@@ -19,6 +19,7 @@ To see an example input, look at the [Example](#example) section.
   - [Transaction types](#transaction-types)
   - [Signing](#signing)
 - [Supported forks](#supported-forks)
+- [Donate](#donate)
 
 # About
 It is extremely difficult to generate valid blocktests when fuzzing as all the hash and root computations in the block's header require actual processing of the block. One bad hash or calculation and the block will be rejected immediately, preventing us from testing anything meaningful.
@@ -279,3 +280,6 @@ via an EIP-1559 transaction on Osaka:
   ]
 }
 ```
+# Donate
+If you've found this tool useful, consider funding its development:  
+eth: ``0x9b9F14A68Cf6846D80cD2C1797cCC04Eb4193e53``
