@@ -3,9 +3,9 @@
 # blocktest-converter
 blocktest-converter is an Ethereum [BlockTest](https://ethereum-tests.readthedocs.io/en/v6.0.0-beta.1/test_types/blockchain_tests.html) test fixture generator from a fuzzer friendly input structure.
 
-To see how it works, look at the [Pipeline](#pipeline) section.
-To see the input format, look at the [Input Format](#input-format) section.
-To see an example input, look at the [Example](#example) section.
+To see how it works, look at the [Pipeline](#pipeline) section.  
+To see the input format, look at the [Input Format](#input-format) section.  
+To see an example input, look at the [Example](#example) section.  
 
 ## Table of contents
 
@@ -39,9 +39,11 @@ It additionally found two known bugs in Reth (create collision with empty accoun
 
 ```rust
 use blocktest_converter::convert;
-
-let blocktest = convert(&json_string)?;
+let fuzzer_input = "{...}";
+let blocktest = convert(fuzzer_input)?;
+// this is the block test we can run block tests with (eg. evm blocktest ./output.json).
 let output = serde_json::to_string_pretty(&blocktest)?;
+std::fs::write("/tmp/blocktest.json", output)?;
 ```
 
 ### C / FFI
