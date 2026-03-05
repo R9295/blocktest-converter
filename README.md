@@ -1,4 +1,5 @@
 # blocktest-converter
+ <img align="right" src="image.jpeg" alt="logo" width="250" heigh="250">
 blocktest-converter is an Ethereum BlockTest test fixture generator from a fuzzer friendly input structure. 
 
 ## Table of contents
