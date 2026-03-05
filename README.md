@@ -15,7 +15,7 @@ blocktest-converter is an Ethereum [BlockTest](https://ethereum-tests.readthedoc
 - [Example Input](#example)
 
 # About
-It is extremely difficult to generate valid blocktests when fuzzing as all the hash and root computations in the block's header require actual processing of the block. One bad hash or calculation and the block will be rejected before immediately, preventing us from testing anything meaningful.
+It is extremely difficult to generate valid blocktests when fuzzing as all the hash and root computations in the block's header require actual processing of the block. One bad hash or calculation and the block will be rejected immediately, preventing us from testing anything meaningful.
 Adding to the difficulty, comes the precise consturction of the test fixture. No surprises, clients have subtle differences in how they parse the test format. This results in false positives or a waste of fuzzer time and compute.
 
 This library aims to solve both problems and to the best of my knowledge, is the only library-based, spec-compliant and documented implementation.
